@@ -16,11 +16,8 @@ const blobToBase64 = (blob: Blob): Promise<string> => {
 };
 
 const getApiKey = () => {
-  const key = process.env.API_KEY;
-  if (!key || key.trim() === "") {
-    throw new Error("API_KEY not configured. Please provide a valid API key.");
-  }
-  return key;
+  // 仅获取值，不在此处抛出中断性异常，交由 GoogleGenAI 实例在调用时反馈
+  return process.env.API_KEY || "";
 };
 
 export const analyzeImageStyle = async (imageBlob: Blob): Promise<string> => {
@@ -37,17 +34,22 @@ export const analyzeImageStyle = async (imageBlob: Blob): Promise<string> => {
   
   Return ONLY a concise, high-quality prompt fragment (under 50 words) that can be used to replicate this exact style in an AI image generator.`;
 
-  const response = await ai.models.generateContent({
-    model: "gemini-3-flash-preview",
-    contents: {
-      parts: [
-        { inlineData: { data: base64Data, mimeType: imageBlob.type } },
-        { text: prompt }
-      ]
-    }
-  });
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: {
+        parts: [
+          { inlineData: { data: base64Data, mimeType: imageBlob.type || 'image/jpeg' } },
+          { text: prompt }
+        ]
+      }
+    });
 
-  return response.text?.trim() || "Hand-drawn children's book style";
+    return response.text?.trim() || "Hand-drawn children's book style";
+  } catch (err: any) {
+    console.error("Gemini analyzeImageStyle internal error:", err);
+    throw err;
+  }
 };
 
 export const generateBookScript = async (data: BookData): Promise<GeneratedScript> => {

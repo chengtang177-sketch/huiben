@@ -20,39 +20,59 @@ export const Sidebar: React.FC<SidebarProps> = ({ data, setData, onGenerate, isG
   };
 
   const ensureApiKey = async () => {
-    if (window.process?.env?.API_KEY) return true;
+    // 检查 process.env.API_KEY 是否有效
+    if (window.process?.env?.API_KEY && window.process.env.API_KEY.length > 5) {
+      return true;
+    }
+    
+    // 如果没有有效 Key 且在 AI Studio 环境下
     if (window.aistudio) {
       const hasKey = await window.aistudio.hasSelectedApiKey();
       if (!hasKey) {
         await window.aistudio.openSelectKey();
+        // 遵循规范：Assume successful and proceed
+        return true; 
       }
     }
-    return true;
+    return false;
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // 先检查 API Key
-    await ensureApiKey();
+    // 清除旧风格
+    handleChange('stylePrompt', '');
+
+    // 预检 API Key
+    const isKeyLikelyReady = await ensureApiKey();
 
     const url = URL.createObjectURL(file);
     setPreviewUrl(url);
 
     setIsAnalyzing(true);
+    
+    // 增加一个小延迟以应对注入竞态（遵循“Proceed”原则的同时给注入留出最小窗口）
+    // 如果是第一次选择 Key，这里即使失败，后面的 catch 也会捕捉并重试
     try {
       const styleDescription = await analyzeImageStyle(file);
       handleChange('stylePrompt', styleDescription);
     } catch (error: any) {
       console.error("Style analysis failed:", error);
-      const msg = error.message || "未知错误";
-      if (msg.includes("API key not valid") || msg.includes("403") || msg.includes("401")) {
-         alert("API 密钥无效或无权访问。请点击右上角'配置 API Key'重新选择付费项目密钥。");
-      } else if (msg.includes("fetch")) {
-         alert("网络请求失败，请检查是否能够正常连接到 Google Gemini 服务（可能需要代理）。");
+      const msg = error.message || String(error);
+      
+      // 捕获权限和密钥错误，再次引导
+      if (msg.includes("API key not valid") || msg.includes("403") || msg.includes("401") || msg.includes("not found")) {
+        if (window.aistudio) {
+          alert("API 密钥无效或未检测到有效付费项目。请通过弹出的对话框重新配置。");
+          await window.aistudio.openSelectKey();
+        } else {
+          alert("风格分析失败：API 密钥配置无效。");
+        }
+      } else if (msg.includes("fetch") || msg.includes("Network")) {
+        alert("网络请求失败：请确保您所在的网络环境可以访问 Google API。");
       } else {
-         alert(`风格分析失败: ${msg}`);
+        alert(`风格分析失败: ${msg}`);
       }
     } finally {
       setIsAnalyzing(false);
