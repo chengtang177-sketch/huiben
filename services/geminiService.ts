@@ -15,8 +15,17 @@ const blobToBase64 = (blob: Blob): Promise<string> => {
   });
 };
 
+const getApiKey = () => {
+  const key = process.env.API_KEY;
+  if (!key || key.trim() === "") {
+    throw new Error("API_KEY not configured. Please provide a valid API key.");
+  }
+  return key;
+};
+
 export const analyzeImageStyle = async (imageBlob: Blob): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const apiKey = getApiKey();
+  const ai = new GoogleGenAI({ apiKey });
   const base64Data = await blobToBase64(imageBlob);
   
   const prompt = `Analyze the artistic style of this children's book illustration. 
@@ -28,7 +37,6 @@ export const analyzeImageStyle = async (imageBlob: Blob): Promise<string> => {
   
   Return ONLY a concise, high-quality prompt fragment (under 50 words) that can be used to replicate this exact style in an AI image generator.`;
 
-  // Fix: Use the correct structure for multimodal contents as per guidelines
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
     contents: {
@@ -43,7 +51,8 @@ export const analyzeImageStyle = async (imageBlob: Blob): Promise<string> => {
 };
 
 export const generateBookScript = async (data: BookData): Promise<GeneratedScript> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const apiKey = getApiKey();
+  const ai = new GoogleGenAI({ apiKey });
   const prompt = `Create a children's picture book script based on:
   Title: ${data.title}
   Theme: ${data.theme}
@@ -65,7 +74,6 @@ export const generateBookScript = async (data: BookData): Promise<GeneratedScrip
   
   Generate a structured response with optimized title, intro, characterDesign, coverPrompt, and story frames.`;
 
-  // Fix: Upgrade to gemini-3-pro-preview for complex script writing and visual design reasoning
   const response = await ai.models.generateContent({
     model: "gemini-3-pro-preview",
     contents: prompt,
@@ -108,7 +116,8 @@ export const generateIllustration = async (
   characterDesign: string = "",
   aspectRatio: "16:9" | "9:16" = "16:9"
 ) => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const apiKey = getApiKey();
+  const ai = new GoogleGenAI({ apiKey });
   
   const fullPrompt = `SCENE: ${prompt}. 
 STYLE: ${stylePrompt}. 

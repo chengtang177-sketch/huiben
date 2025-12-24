@@ -19,9 +19,23 @@ export const Sidebar: React.FC<SidebarProps> = ({ data, setData, onGenerate, isG
     setData({ ...data, [key]: value });
   };
 
+  const ensureApiKey = async () => {
+    if (window.process?.env?.API_KEY) return true;
+    if (window.aistudio) {
+      const hasKey = await window.aistudio.hasSelectedApiKey();
+      if (!hasKey) {
+        await window.aistudio.openSelectKey();
+      }
+    }
+    return true;
+  };
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    // 先检查 API Key
+    await ensureApiKey();
 
     const url = URL.createObjectURL(file);
     setPreviewUrl(url);
@@ -29,11 +43,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ data, setData, onGenerate, isG
     setIsAnalyzing(true);
     try {
       const styleDescription = await analyzeImageStyle(file);
-      // 将分析结果填入 stylePrompt 文本框，而不是 visualAnchor
       handleChange('stylePrompt', styleDescription);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Style analysis failed:", error);
-      alert("风格分析失败，请稍后重试。");
+      const msg = error.message || "未知错误";
+      if (msg.includes("API key not valid") || msg.includes("403") || msg.includes("401")) {
+         alert("API 密钥无效或无权访问。请点击右上角'配置 API Key'重新选择付费项目密钥。");
+      } else if (msg.includes("fetch")) {
+         alert("网络请求失败，请检查是否能够正常连接到 Google Gemini 服务（可能需要代理）。");
+      } else {
+         alert(`风格分析失败: ${msg}`);
+      }
     } finally {
       setIsAnalyzing(false);
     }
@@ -63,7 +83,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ data, setData, onGenerate, isG
       </div>
 
       <div className="space-y-4">
-        {/* 风格参考上传区 (可选) */}
         <section className="bg-gray-50/50 p-4 rounded-xl border border-dashed border-gray-200">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2 text-gray-700 font-bold text-xs uppercase tracking-wider">
