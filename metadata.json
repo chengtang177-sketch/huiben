@@ -1,0 +1,7 @@
+{
+  "name": "MommyBook AI - Children's Picture Book Creator",
+  "description": "An AI-powered tool for creating professional children's picture books, featuring script generation, storyboarding, and automatic illustrations.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
