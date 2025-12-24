@@ -28,16 +28,15 @@ export const analyzeImageStyle = async (imageBlob: Blob): Promise<string> => {
   
   Return ONLY a concise, high-quality prompt fragment (under 50 words) that can be used to replicate this exact style in an AI image generator.`;
 
+  // Fix: Use the correct structure for multimodal contents as per guidelines
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
-    contents: [
-      {
-        parts: [
-          { inlineData: { data: base64Data, mimeType: imageBlob.type } },
-          { text: prompt }
-        ]
-      }
-    ]
+    contents: {
+      parts: [
+        { inlineData: { data: base64Data, mimeType: imageBlob.type } },
+        { text: prompt }
+      ]
+    }
   });
 
   return response.text?.trim() || "Hand-drawn children's book style";
@@ -66,8 +65,9 @@ export const generateBookScript = async (data: BookData): Promise<GeneratedScrip
   
   Generate a structured response with optimized title, intro, characterDesign, coverPrompt, and story frames.`;
 
+  // Fix: Upgrade to gemini-3-pro-preview for complex script writing and visual design reasoning
   const response = await ai.models.generateContent({
-    model: "gemini-3-flash-preview",
+    model: "gemini-3-pro-preview",
     contents: prompt,
     config: {
       responseMimeType: "application/json",

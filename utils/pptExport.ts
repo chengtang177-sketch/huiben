@@ -42,13 +42,14 @@ export const downloadPpt = async (script: GeneratedScript) => {
     
     // Image (if exists) - Adjusted for 16:9 landscape layout
     if (frame.imageUrl) {
+      // Fix: pptxgenjs sizing config requires w and h to match the layout dimensions
       slide.addImage({
         data: frame.imageUrl,
         x: 0,
         y: 0,
         w: "100%",
         h: "75%",
-        sizing: { type: "contain" }
+        sizing: { type: "contain", w: "100%", h: "75%" }
       });
     } else {
       slide.addText("图片未生成", {

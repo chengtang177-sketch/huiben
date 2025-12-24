@@ -7,10 +7,25 @@
     <title>MommyBook AI - 绘本领读助手</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        // 垫片：防止浏览器环境因为缺少 Node.js 的 process 变量而崩溃
+        window.process = {
+            env: {
+                // 如果部署环境没有自动替换，这里可以作为后备
+                API_KEY: "" 
+            }
+        };
+    </script>
     <style>
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
             background-color: #f8fafc;
+            margin: 0;
+            padding: 0;
+        }
+        #root {
+            height: 100vh;
+            width: 100vw;
         }
     </style>
 <script type="importmap">
@@ -20,6 +35,7 @@
     "react": "https://esm.sh/react@^19.2.3",
     "@google/genai": "https://esm.sh/@google/genai@^1.34.0",
     "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react-dom": "https://esm.sh/react-dom@^19.2.3",
     "pptxgenjs": "https://esm.sh/pptxgenjs@3.12.0"
   }
 }
@@ -27,5 +43,7 @@
 </head>
 <body>
     <div id="root"></div>
+    <!-- 必须显式引入入口文件，否则浏览器不会加载 React 应用 -->
+    <script type="module" src="./index.tsx"></script>
 </body>
 </html>

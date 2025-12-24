@@ -1,11 +1,24 @@
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { Storyboard } from './components/Storyboard';
 import { PptPreview } from './components/PptPreview';
 import { BookData, GeneratedScript, TabType } from './types';
 import { generateBookScript, generateIllustration } from './services/geminiService';
 import { downloadPpt } from './utils/pptExport';
+
+// 扩展 window 对象以支持 AI Studio 特有方法
+declare global {
+  interface AIStudio {
+    hasSelectedApiKey: () => Promise<boolean>;
+    openSelectKey: () => Promise<void>;
+  }
+  interface Window {
+    // Fix: Use optional modifier to match potential existing declarations and avoid "identical modifiers" error
+    aistudio?: AIStudio;
+    process?: any;
+  }
+}
 
 const App: React.FC = () => {
   const [data, setData] = useState<BookData>({
@@ -24,16 +37,68 @@ const App: React.FC = () => {
   const [coverAspectRatio, setCoverAspectRatio] = useState<"16:9" | "9:16">("16:9");
   const [script, setScript] = useState<GeneratedScript | null>(null);
 
+  // 部署后的初始化检查
+  useEffect(() => {
+    const checkStatus = async () => {
+      // 检查 API_KEY 是否存在于 process.env 中（Vercel 注入）
+      const hasEnvKey = !!(window.process?.env?.API_KEY);
+      
+      if (!hasEnvKey && window.aistudio) {
+        const hasSelected = await window.aistudio.hasSelectedApiKey();
+        if (!hasSelected) {
+           console.log("未检测到 API_KEY 环境变量，引导用户通过 AI Studio 选择 Key");
+        }
+      }
+    };
+    checkStatus();
+  }, []);
+
+  // 检查并请求 API Key
+  const ensureApiKey = async () => {
+    // 优先使用环境变量
+    if (window.process?.env?.API_KEY) return true;
+
+    if (window.aistudio) {
+      const hasKey = await window.aistudio.hasSelectedApiKey();
+      if (!hasKey) {
+        await window.aistudio.openSelectKey();
+        return true; 
+      }
+    }
+    return true;
+  };
+
+  const handleError = async (error: any) => {
+    console.error("API Error:", error);
+    const errorMessage = error.message || String(error);
+    
+    // 如果是密钥相关错误，引导用户重新选择
+    if (errorMessage.includes("Requested entity was not found") || 
+        errorMessage.includes("API_KEY") || 
+        errorMessage.includes("403") || 
+        errorMessage.includes("401") ||
+        errorMessage.includes("API key not valid")) {
+      if (window.aistudio) {
+        alert("API 认证失败。如果您已在 Vercel 配置了 API_KEY，请检查是否生效；或者在此重新选择有效的付费项目密钥。");
+        await window.aistudio.openSelectKey();
+      } else {
+        alert("API 调用失败，请检查部署环境的 API_KEY 变量是否配置正确。");
+      }
+    } else {
+      alert(`操作失败: ${errorMessage}`);
+    }
+  };
+
   const handleGenerateScript = async () => {
     if (!data.title) return;
+    await ensureApiKey();
     setIsGenerating(true);
     try {
       const generated = await generateBookScript(data);
       setScript(generated);
       setActiveTab('storyboard');
     } catch (error) {
-      console.error("Script generation failed:", error);
-      alert("生成剧本失败，请重试。");
+      await handleError(error);
     } finally {
       setIsGenerating(false);
     }
@@ -54,6 +119,7 @@ const App: React.FC = () => {
 
   const handleGenerateFrameImage = async (frameId: string) => {
     if (!script) return;
+    await ensureApiKey();
     
     setScript(prev => {
       if (!prev) return null;
@@ -83,7 +149,7 @@ const App: React.FC = () => {
         };
       });
     } catch (error) {
-      console.error("Image generation failed:", error);
+      await handleError(error);
       setScript(prev => {
         if (!prev) return null;
         return {
@@ -91,12 +157,12 @@ const App: React.FC = () => {
           frames: prev.frames.map(f => f.id === frameId ? { ...f, isGeneratingImage: false } : f)
         };
       });
-      alert("生成图片失败，请重试。");
     }
   };
 
   const handleGenerateCover = async () => {
     if (!script) return;
+    await ensureApiKey();
     setIsGeneratingCover(true);
     try {
       const enhancedCoverPrompt = `${script.coverPrompt}. Focus exclusively on the main characters. No text, no letters, no titles, no Chinese characters, pure visual illustration only.`;
@@ -110,8 +176,7 @@ const App: React.FC = () => {
       );
       setScript(prev => prev ? { ...prev, coverUrl: url } : null);
     } catch (error) {
-      console.error("Cover generation failed", error);
-      alert("生成封面失败，请重试。");
+      await handleError(error);
     } finally {
       setIsGeneratingCover(false);
     }
@@ -142,10 +207,20 @@ const App: React.FC = () => {
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" /></svg>
             </div>
           </div>
-          <button className="flex items-center gap-2 text-gray-600 text-sm hover:text-gray-900 font-medium">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-            历史
-          </button>
+          <div className="flex items-center gap-4">
+             {window.aistudio && (
+                <button 
+                  onClick={() => window.aistudio?.openSelectKey()}
+                  className="text-xs text-blue-500 hover:underline font-medium"
+                >
+                  配置 API Key
+                </button>
+             )}
+             <button className="flex items-center gap-2 text-gray-600 text-sm hover:text-gray-900 font-medium">
+               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+               历史
+             </button>
+          </div>
         </header>
 
         <main className="flex-1 overflow-y-auto p-8 bg-gray-50/50">
